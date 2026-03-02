@@ -1,5 +1,11 @@
 # 🎮 数织游戏网站设计文档
 
+> **版本**: v0.1.0  
+> **最后更新**: 2024-03-02  
+> **状态**: 核心功能已实现，图片生成功能待开发
+
+---
+
 ## 1. 技术栈
 
 | 层级 | 技术 | 版本 | 说明 |
@@ -8,11 +14,87 @@
 | **语言** | TypeScript | 5.x | 静态类型，智能提示 |
 | **样式** | CSS3 | - | 原生变量，现代布局 |
 | **渲染** | Canvas 2D API | - | 高性能网格渲染 |
-| **存储** | LocalStorage | - | 本地进度保存 |
+| **存储** | LocalStorage | - | 本地进度保存（待实现） |
 
 ---
 
-## 2. 系统架构
+## 2. 快速开始
+
+### 安装依赖
+```bash
+npm install
+```
+
+### 开发模式
+```bash
+npm run dev
+# 打开 http://localhost:3000
+```
+
+### 生产构建
+```bash
+npm run build
+# 输出到 dist/ 目录
+```
+
+---
+
+## 3. 已实现功能 ✅
+
+### 3.1 核心游戏
+- [x] 网格点击填充/标记 ✕
+- [x] 鼠标拖拽连续填充
+- [x] 行列数字提示显示
+- [x] 实时胜利判定
+- [x] 计时器功能
+- [x] 完成度统计
+
+### 3.2 历史操作
+- [x] 撤销功能（Ctrl+Z）
+- [x] 重做功能（Ctrl+Shift+Z）
+- [x] 清空网格
+- [x] 操作历史队列
+
+### 3.3 用户界面
+- [x] 填充/标记模式切换
+- [x] 题目选择菜单
+- [x] 难度筛选（简单/中等/困难）
+- [x] 胜利弹窗
+- [x] 响应式布局（PC/移动端）
+- [x] 键盘快捷键支持
+
+### 3.4 预设题目
+- [x] 8个预设题目
+  - 3个简单（5x5）：爱心、星星、箭头
+  - 2个中等（10x10）：猫咪、花朵
+  - 1个中等（15x15）：房子
+  - 2个困难（20x20）：大树
+
+---
+
+## 4. 待实现功能 📋
+
+### 4.1 高优先级
+- [ ] 本地存储（保存/恢复游戏进度）
+- [ ] 图片上传生成数织
+- [ ] 图片处理参数调节（网格大小、阈值、平滑）
+- [ ] 提示系统（自动解答一行/列）
+
+### 4.2 中优先级
+- [ ] 触摸设备优化（长按、手势）
+- [ ] 主题切换（深色/浅色模式）
+- [ ] 音效系统
+- [ ] 更多预设题目（目标20+）
+
+### 4.3 低优先级
+- [ ] 自定义题目导入/导出
+- [ ] 分享功能
+- [ ] 打印功能
+- [ ] 成就系统
+
+---
+
+## 5. 系统架构
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -35,7 +117,7 @@
 │  │  └─────────┘  └─────────┘  └────────┘│        │
 │  └───────────────────────────────────────┘        │
 │  ┌───────────────────────────────────────┐        │
-│  │      Generator Engine                  │        │
+│  │      Generator Engine [待实现]         │        │
 │  │  ┌─────────┐  ┌─────────┐             │        │
 │  │  │ Image   │  │ Puzzle  │             │        │
 │  │  │Processor│  │Generator│             │        │
@@ -55,9 +137,9 @@
 
 ---
 
-## 3. 数据模型
+## 6. 数据模型
 
-### 3.1 核心类型定义
+### 6.1 核心类型定义
 
 ```typescript
 // 坐标
@@ -83,6 +165,7 @@ interface GameState {
   historyIndex: number;          // 当前历史位置
   isComplete: boolean;           // 是否完成
   startTime: number;             // 开始时间
+  elapsedTime: number;           // 经过时间（毫秒）
 }
 
 // 历史操作（用于撤销）
@@ -98,7 +181,7 @@ interface PresetPuzzle {
   name: string;
   difficulty: 'easy' | 'medium' | 'hard';
   solution: boolean[][];
-  thumbnail?: string;            // 预览图（可选）
+  thumbnail?: string;
 }
 
 // 图片生成配置
@@ -112,34 +195,39 @@ interface GeneratorConfig {
 
 ---
 
-## 4. 模块设计
+## 7. 模块设计
 
-### 4.1 核心游戏模块 (Game.ts)
+### 7.1 核心游戏模块 (Game.ts) ✅
 
-**职责：** 管理游戏状态、处理用户输入、判定胜负
+**位置**: `src/core/Game.ts`
+
+**已实现功能**:
+- 游戏状态管理
+- 单元格填充/标记
+- 撤销/重做系统
+- 胜利判定
+- 计时器
 
 ```typescript
 class Game {
-  // 状态
-  private state: GameState;
-  
-  // 核心方法
-  constructor(puzzle: PresetPuzzle | GeneratedPuzzle);
+  constructor(puzzle: PresetPuzzle);
   
   // 操作
-  fillCell(pos: Position): void;           // 填充单元格
-  markCell(pos: Position): void;           // 标记X
-  clearCell(pos: Position): void;          // 清空
-  fillLine(start: Position, end: Position): void; // 拖拽填充
+  setCell(pos: Position, state: CellState): void;
+  toggleCell(pos: Position, isFillMode: boolean): void;
+  setCells(positions: Position[], state: CellState): void;
   
   // 历史
-  undo(): boolean;                         // 撤销
-  redo(): boolean;                         // 重做
-  clearHistory(): void;                    // 清空历史
+  undo(): boolean;
+  redo(): boolean;
+  clear(): void;
   
-  // 验证
-  checkWin(): boolean;                     // 检查胜利
-  checkLine(line: number, isRow: boolean): boolean; // 检查单行/列
+  // 查询
+  getState(): GameState;
+  canUndo(): boolean;
+  canRedo(): boolean;
+  getProgress(): number;
+  formatTime(): string;
   
   // 事件
   onStateChange(callback: (state: GameState) => void): void;
@@ -147,210 +235,160 @@ class Game {
 }
 ```
 
-### 4.2 渲染引擎 (Renderer.ts)
+### 7.2 渲染引擎 (Renderer.ts) ✅
 
-**职责：** 将游戏状态渲染到 Canvas
+**位置**: `src/ui/Renderer.ts`
+
+**已实现功能**:
+- Canvas 自适应渲染
+- 行列提示显示
+- 网格线绘制（含5格粗线）
+- 单元格状态渲染
+- 坐标转换
 
 ```typescript
 class Renderer {
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+  constructor(canvas: HTMLCanvasElement, config?: Partial<RenderConfig>);
   
-  constructor(container: HTMLElement, config: RenderConfig);
-  
-  // 渲染
   render(state: GameState): void;
-  renderGrid(): void;                      // 渲染网格线
-  renderCells(grid: CellState[][]): void;  // 渲染单元格
-  renderHints(rowHints: number[][], colHints: number[][]): void;
-  
-  // 坐标转换
-  getCellFromPosition(x: number, y: number): Position | null;
-  
-  // 动画
-  highlightLine(index: number, isRow: boolean): void;
-  animateWin(): void;
+  getCellFromPosition(mouseX: number, mouseY: number): Position | null;
+  updateConfig(config: Partial<RenderConfig>): void;
 }
 ```
 
-### 4.3 图片处理器 (ImageProcessor.ts)
+### 7.3 图片处理器 (ImageProcessor.ts) 📋
 
-**职责：** 将图片转换为数织谜题
+**状态**: 待实现  
+**位置**: `src/generator/ImageProcessor.ts`
 
 ```typescript
 class ImageProcessor {
-  // 处理流程
-  async processImage(
-    file: File, 
-    config: GeneratorConfig
-  ): Promise<ProcessedImage>;
+  async processImage(file: File, config: GeneratorConfig): Promise<ProcessedImage>;
   
-  // 步骤
   private loadImage(file: File): Promise<HTMLImageElement>;
   private resize(image: HTMLImageElement, size: number): ImageData;
   private toGrayscale(data: ImageData): Uint8Array;
   private applyThreshold(data: Uint8Array, threshold: number): boolean[];
   private smoothEdges(binary: boolean[], width: number): boolean[];
-  private generateHints(grid: boolean[][]): { row: number[][], col: number[][] };
 }
 ```
 
-### 4.4 存储管理 (Storage.ts)
+### 7.4 存储管理 (Storage.ts) 📋
+
+**状态**: 待实现  
+**位置**: `src/utils/storage.ts`
 
 ```typescript
 class Storage {
-  private prefix = 'nonogram_';
-  
-  // 进度
   saveProgress(puzzleId: string, state: GameState): void;
   loadProgress(puzzleId: string): GameState | null;
-  clearProgress(puzzleId: string): void;
-  
-  // 设置
   saveSettings(settings: UserSettings): void;
   loadSettings(): UserSettings;
-  
-  // 自定义题目
-  saveCustomPuzzle(puzzle: PresetPuzzle): void;
-  loadCustomPuzzles(): PresetPuzzle[];
 }
 ```
 
 ---
 
-## 5. 界面设计
-
-### 5.1 页面结构
+## 8. 项目文件结构
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  Header                    [Settings] [Sound]       │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  ┌─────────────────┐    ┌───────────────────────┐  │
-│  │                 │    │                       │  │
-│  │   Game Board    │    │      Sidebar          │  │
-│  │   (Canvas)      │    │  ┌─────────────────┐  │  │
-│  │                 │    │  │  Preview        │  │  │
-│  │   ┌───────┐     │    │  │  (完成图)        │  │  │
-│  │   │Hints  │     │    │  └─────────────────┘  │  │
-│  │   │       │     │    │  ┌─────────────────┐  │  │
-│  │   │ Grid  │     │    │  │  Controls       │  │  │
-│  │   │       │     │    │  │  [Fill] [Mark]  │  │  │
-│  │   └───────┘     │    │  │  [Undo] [Redo]  │  │  │
-│  │                 │    │  │  [Clear] [Hint] │  │  │
-│  │                 │    │  └─────────────────┘  │  │
-│  │                 │    │  ┌─────────────────┐  │  │
-│  │                 │    │  │  Progress       │  │  │
-│  │                 │    │  │  Time: 00:05:23 │  │  │
-│  │                 │    │  │  Cells: 45/120  │  │  │
-│  │                 │    │  └─────────────────┘  │  │
-│  └─────────────────┘    └───────────────────────┘  │
-│                                                     │
-├─────────────────────────────────────────────────────┤
-│  [Menu]  Presets | Custom | Generate from Image    │
-└─────────────────────────────────────────────────────┘
-```
-
-### 5.2 菜单界面（预设题目选择）
-
-```
-┌─────────────────────────────────────────────────────┐
-│              Select a Puzzle                        │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  [All] [Easy ★] [Medium ★★] [Hard ★★★] [Custom]   │
-│                                                     │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐  │
-│  │ ▓▓░░▓▓  │ │ ▓▓▓▓▓▓  │ │ ▓░▓░▓░  │ │ [+Img]  │  │
-│  │ ░░▓▓░░  │ │ ▓░░░░▓  │ │ ░▓░▓░▓  │ │         │  │
-│  │ ▓▓░░▓▓  │ │ ▓▓▓▓▓▓  │ │ ▓░▓░▓░  │ │ Upload  │  │
-│  │         │ │         │ │         │ │  Image  │  │
-│  │ Heart   │ │ Star    │ │ Pattern │ │         │  │
-│  │ 5x5 ★   │ │ 10x10 ★ │ │ 15x15★★ │ │         │  │
-│  └─────────┘ └─────────┘ └─────────┘ └─────────┘  │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
-
-### 5.3 图片生成配置界面
-
-```
-┌─────────────────────────────────────────────────────┐
-│         Generate from Image                         │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  [Upload Image]                                     │
-│                                                     │
-│  ┌─────────────────┐  ┌─────────────────────────┐  │
-│  │                 │  │  Grid Size: [15] ▲▼     │  │
-│  │   Preview       │  │      (5 - 25)           │  │
-│  │   (Original)    │  │                         │  │
-│  │                 │  │  Threshold: [128] ─────○│  │
-│  │                 │  │      (0 - 255)          │  │
-│  │                 │  │                         │  │
-│  └─────────────────┘  │  [✓] Smooth Edges       │  │
-│                       │  [ ] Invert Colors      │  │
-│  ┌─────────────────┐  │                         │  │
-│  │   Result        │  │  ┌─────────────────┐    │  │
-│  │   Preview       │  │  │ ▓▓░░▓▓░░▓▓░░   │    │  │
-│  │   (Grid)        │  │  │ ░░▓▓░░▓▓░░▓▓   │    │  │
-│  │                 │  │  │ ▓▓░░▓▓░░▓▓░░   │    │  │
-│  └─────────────────┘  │  └─────────────────┘    │  │
-│                       │                         │  │
-│                       │  [Generate] [Play Now]  │  │
-│                       └─────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
+nonogram/
+├── docs/
+│   └── design.md                 # 本设计文档
+├── index.html                    # 入口页面 ✅
+├── package.json                  # 项目配置 ✅
+├── tsconfig.json                 # TS 配置 ✅
+├── vite.config.ts                # Vite 配置 ✅
+└── src/
+    ├── main.ts                   # 应用入口 ✅
+    ├── style.css                 # 全局样式 ✅
+    ├── types/
+    │   └── index.ts              # 类型定义 ✅
+    ├── core/
+    │   └── Game.ts               # 游戏核心 ✅
+    ├── ui/
+    │   └── Renderer.ts           # Canvas 渲染 ✅
+    ├── data/
+    │   └── presets.ts            # 预设题目 ✅
+    ├── generator/                # 📋 待创建
+    │   └── ImageProcessor.ts     # 图片处理
+    └── utils/                    # 📋 待创建
+        └── storage.ts            # 本地存储
 ```
 
 ---
 
-## 6. 游戏交互逻辑
+## 9. 用户界面
 
-### 6.1 操作模式
+### 9.1 当前界面
 
-| 模式 | 鼠标左键 | 鼠标右键 | 触摸操作 |
-|------|----------|----------|----------|
-| **填充模式** | 填充单元格 | 标记X | 单击切换 |
-| **标记模式** | 标记X | 填充单元格 | 长按菜单选择 |
-| **拖拽** | 连续填充 | - | 不支持 |
+游戏主界面包含：
+- **左侧**: Canvas 游戏区域（网格 + 提示数字）
+- **右侧**: 控制面板
+  - 模式切换（填充/标记）
+  - 操作按钮（撤销、重做、清空）
+  - 统计信息（时间、完成度）
+- **顶部**: 标题栏和菜单按钮
+- **弹窗**: 题目选择菜单、胜利提示
 
-### 6.2 键盘快捷键
+### 9.2 操作说明
 
-| 按键 | 功能 |
+| 操作 | 功能 |
 |------|------|
-| `Z` | 撤销 |
-| `Shift + Z` | 重做 |
-| `F` | 切换填充/标记模式 |
-| `H` | 显示提示（高亮可确定单元格） |
-| `R` | 重新开始当前谜题 |
-| `S` | 保存进度 |
-
-### 6.3 胜利判定算法
-
-```typescript
-function checkWin(grid: CellState[][], solution: boolean[][]): boolean {
-  for (let row = 0; row < grid.length; row++) {
-    for (let col = 0; col < grid[0].length; col++) {
-      const isFilled = grid[row][col] === CellState.FILLED;
-      const shouldFill = solution[row][col];
-      
-      // 必须填充的必须已填充
-      if (shouldFill && !isFilled) return false;
-      
-      // 不能填充的不能已填充
-      if (!shouldFill && isFilled) return false;
-    }
-  }
-  return true;
-}
-```
+| 左键单击 | 根据当前模式填充或标记 |
+| 右键单击 | 反向操作（填充↔标记） |
+| 拖拽 | 连续填充/标记 |
+| Z | 撤销 |
+| Shift + Z | 重做 |
+| F | 切换填充/标记模式 |
+| R | 清空当前网格 |
 
 ---
 
-## 7. 图片生成算法
+## 10. 测试
 
-### 7.1 处理流程
+### 10.1 手动测试清单
+
+#### 核心功能测试
+- [ ] 点击单元格正确填充/标记
+- [ ] 拖拽连续填充正常工作
+- [ ] 撤销/重做功能正确
+- [ ] 胜利判定准确
+- [ ] 计时器正常运行
+
+#### 界面测试
+- [ ] 题目菜单正常弹出/关闭
+- [ ] 难度筛选正常工作
+- [ ] 胜利弹窗正确显示
+- [ ] 响应式布局在移动端正常
+
+#### 边界情况
+- [ ] 快速连续点击不会出错
+- [ ] 拖拽到网格外不会崩溃
+- [ ] 切换题目后状态正确重置
+
+### 10.2 单元测试（待添加）
+
+推荐使用 **Vitest** 框架：
+
+```bash
+# 安装测试依赖
+npm install -D vitest @vitest/ui jsdom @types/jsdom
+
+# 运行测试
+npm test
+
+# 运行测试并查看 UI
+npm run test:ui
+```
+
+测试文件位置：`src/**/*.test.ts`
+
+---
+
+## 11. 图片生成算法（设计）
+
+### 11.1 处理流程
 
 ```typescript
 async function generateFromImage(
@@ -378,7 +416,7 @@ async function generateFromImage(
     binary.push(gray < config.threshold);
   }
   
-  // 5. 可选：平滑处理（去除孤立像素）
+  // 5. 可选：平滑处理
   if (config.smoothing) {
     return smoothEdges(binary, config.gridSize);
   }
@@ -388,13 +426,10 @@ async function generateFromImage(
 }
 ```
 
-### 7.2 边缘平滑算法
+### 11.2 边缘平滑算法
 
 ```typescript
-function smoothEdges(
-  binary: boolean[], 
-  size: number
-): boolean[] {
+function smoothEdges(binary: boolean[], size: number): boolean[] {
   const result = [...binary];
   
   for (let i = 0; i < binary.length; i++) {
@@ -417,7 +452,7 @@ function smoothEdges(
       }
     }
     
-    // 如果周围多数为填充，则填充；反之亦然
+    // 如果周围多数为填充，则填充
     result[i] = neighbors > total / 2;
   }
   
@@ -427,212 +462,47 @@ function smoothEdges(
 
 ---
 
-## 8. 预设题目设计
+## 12. 部署
 
-### 8.1 题目规格
-
-| 难度 | 大小 | 数量 | 示例 |
-|------|------|------|------|
-| 入门 | 5x5 | 3个 | 心形、星形、箭头 |
-| 简单 | 10x10 | 4个 | 猫咪、花朵、音符 |
-| 中等 | 15x15 | 4个 | 房子、汽车、动物 |
-| 困难 | 20x20 | 3个 | 风景、人物、复杂图案 |
-
-### 8.2 数据结构示例
-
-```typescript
-// src/data/presets.ts
-export const PRESETS: PresetPuzzle[] = [
-  {
-    id: 'heart-5x5',
-    name: '爱心',
-    difficulty: 'easy',
-    solution: [
-      [0, 1, 0, 1, 0],
-      [1, 1, 1, 1, 1],
-      [1, 1, 1, 1, 1],
-      [0, 1, 1, 1, 0],
-      [0, 0, 1, 0, 0],
-    ]
-  },
-  // ... 更多题目
-];
-```
-
----
-
-## 9. 项目文件结构
-
-```
-nonogram/
-├── index.html                    # 入口页面
-├── package.json                  # 项目配置
-├── tsconfig.json                 # TS 配置
-├── vite.config.ts                # Vite 配置
-├── public/
-│   └── favicon.svg               # 网站图标
-├── src/
-│   ├── main.ts                   # 应用入口
-│   ├── style.css                 # 全局样式
-│   ├── types/
-│   │   └── index.ts              # 类型定义
-│   ├── core/
-│   │   ├── Game.ts               # 游戏核心
-│   │   ├── Grid.ts               # 网格工具
-│   │   └── Validator.ts          # 验证逻辑
-│   ├── components/
-│   │   ├── GameBoard.ts          # 游戏面板组件
-│   │   ├── ControlPanel.ts       # 控制面板
-│   │   ├── PuzzleGallery.ts      # 题目画廊
-│   │   └── ImageGenerator.ts     # 图片生成器
-│   ├── ui/
-│   │   ├── Renderer.ts           # Canvas 渲染
-│   │   └── EventHandler.ts       # 事件处理
-│   ├── generator/
-│   │   ├── ImageProcessor.ts     # 图片处理
-│   │   └── PuzzleGenerator.ts    # 谜题生成
-│   ├── data/
-│   │   └── presets.ts            # 预设题目
-│   └── utils/
-│       ├── storage.ts            # 本地存储
-│       └── helpers.ts            # 辅助函数
-└── docs/
-    └── design.md                 # 本设计文档
-```
-
----
-
-## 10. 开发计划
-
-### Phase 1: 基础框架（1-2天）
-
-- [ ] 初始化 Vite 项目
-- [ ] 配置 TypeScript
-- [ ] 搭建基础页面结构
-- [ ] 定义核心类型
-
-### Phase 2: 核心游戏（2-3天）
-
-- [ ] 实现 Game 类
-- [ ] Canvas 渲染引擎
-- [ ] 鼠标/触摸交互
-- [ ] 撤销/重做系统
-- [ ] 胜利判定
-
-### Phase 3: 预设题目（1天）
-
-- [ ] 设计并实现 15-20 个预设题目
-- [ ] 题目选择界面
-- [ ] 难度过滤
-
-### Phase 4: 图片生成（2-3天）
-
-- [ ] 图片上传功能
-- [ ] Canvas 图片处理
-- [ ] 参数调节界面
-- [ ] 实时预览
-- [ ] 边缘平滑算法
-
-### Phase 5: 优化完善（1-2天）
-
-- [ ] 本地存储（进度保存）
-- [ ] 动画效果
-- [ ] 响应式布局
-- [ ] 性能优化
-
-### Phase 6: 测试部署（1天）
-
-- [ ] 功能测试
-- [ ] 构建优化
-- [ ] 部署上线
-
-**总计：约 8-12 天**
-
----
-
-## 11. 技术要点
-
-### 11.1 Canvas 性能优化
-
-```typescript
-// 使用离屏 Canvas 缓存
-class Renderer {
-  private cache: Map<string, HTMLCanvasElement> = new Map();
-  
-  render() {
-    // 只重绘变化的部分
-    // 静态元素使用缓存
-  }
-}
-```
-
-### 11.2 响应式设计
-
-```css
-/* 使用 CSS 变量管理尺寸 */
-:root {
-  --cell-size: clamp(20px, 4vw, 40px);
-  --grid-gap: 1px;
-  --hint-width: 60px;
-}
-
-/* Canvas 根据容器自适应 */
-canvas {
-  max-width: 100%;
-  height: auto;
-}
-```
-
-### 11.3 触摸设备优化
-
-```typescript
-// 防止双击缩放
-canvas.addEventListener('touchstart', (e) => {
-  if (e.touches.length > 1) {
-    e.preventDefault();
-  }
-}, { passive: false });
-
-// 长按识别
-let touchTimer: number;
-canvas.addEventListener('touchstart', () => {
-  touchTimer = setTimeout(() => {
-    // 显示操作菜单
-  }, 500);
-});
-```
-
----
-
-## 12. 扩展功能（可选）
-
-按优先级排序：
-
-1. **提示系统** - 自动标记可确定的单元格
-2. **计时器** - 记录解题时间
-3. **音效** - 填充音效、胜利音效
-4. **主题切换** - 深色/浅色/彩色主题
-5. **导入/导出** - 分享自定义谜题
-6. **打印功能** - 打印谜题供线下游玩
-
----
-
-## 13. 部署方案
-
-### 方案 A：静态托管（推荐）
-
-- **Vercel**：GitHub 集成，自动部署
-- **Netlify**：拖拽部署，简单快捷
-- **GitHub Pages**：免费，与代码仓库一体
-
-### 方案 B：自有服务器
-
+### 本地预览
 ```bash
-# 构建
-npm run build
-
-# 输出 dist/ 目录，包含：
-# - index.html
-# - assets/ (JS, CSS)
-# - 纯静态文件，任何服务器均可托管
+npm run preview
 ```
+
+### 静态托管
+```bash
+npm run build
+# 部署 dist/ 目录到：
+# - Vercel
+# - Netlify
+# - GitHub Pages
+# - 任意静态服务器
+```
+
+---
+
+## 13. 更新日志
+
+### v0.1.0 (2024-03-02)
+- ✅ 初始化项目（Vite + TypeScript）
+- ✅ 实现核心游戏逻辑（Game.ts）
+- ✅ 实现 Canvas 渲染引擎（Renderer.ts）
+- ✅ 实现撤销/重做系统
+- ✅ 添加8个预设题目
+- ✅ 实现题目选择菜单
+- ✅ 添加键盘快捷键支持
+- ✅ 响应式布局适配
+
+---
+
+## 14. 待解决问题
+
+1. **触摸设备**: 当前主要支持鼠标操作，需要添加触摸手势支持
+2. **本地存储**: 游戏进度无法保存，刷新页面会丢失
+3. **图片生成**: 核心需求尚未实现
+4. **测试覆盖**: 缺少自动化测试
+5. **性能**: 大规模网格（20x20+）可能需要优化
+
+---
+
+*本文档持续更新，记录项目开发进度和技术决策。*
