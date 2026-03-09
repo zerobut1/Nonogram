@@ -98,6 +98,11 @@ export class Game {
     const currentState = this.state.grid[pos.row][pos.col];
     if (currentState === state) return;
 
+    // 纠错模式下，已落子的格子不再响应手动点击或拖拽修改。
+    if (this.state.mode === 'assist' && currentState !== CellState.EMPTY) {
+      return;
+    }
+
     if (this.state.mode === 'assist') {
       const correctionState = this.getCorrectionState(pos, state);
       if (correctionState !== null) {
@@ -116,6 +121,10 @@ export class Game {
     if (!this.isValidPosition(pos)) return;
 
     const currentState = this.state.grid[pos.row][pos.col];
+    if (this.state.mode === 'assist' && currentState !== CellState.EMPTY) {
+      return;
+    }
+
     const targetState = isFillMode ? CellState.FILLED : CellState.MARKED;
 
     if (this.state.mode === 'assist' && currentState === targetState) {
