@@ -49,13 +49,56 @@ export class Renderer {
     this.ctx.scale(this.dpr, this.dpr);
   }
 
+  private getLayoutMetrics(state: GameState) {
+    const { cellSize, hintWidth, gap } = this.config;
+    const fontSize = this.getHintFontSize();
+    const horizontalSpacing = this.getHintHorizontalSpacing();
+    const verticalSpacing = this.getHintVerticalSpacing();
+    const horizontalPadding = Math.max(10, Math.floor(cellSize * 0.3));
+    const verticalPadding = Math.max(10, Math.floor(cellSize * 0.3));
+    const size = state.grid.length;
+
+    this.ctx.font = `${fontSize}px Arial`;
+
+    const rowHintWidth = Math.max(
+      hintWidth,
+      ...state.rowHints.map((hints) => {
+        const totalTextWidth = hints.reduce((width, hint) => {
+          return width + this.ctx.measureText(String(hint)).width;
+        }, 0);
+        const totalSpacing = Math.max(0, hints.length - 1) * horizontalSpacing;
+        return Math.ceil(totalTextWidth + totalSpacing + horizontalPadding * 2);
+      })
+    );
+
+    const colHintHeight = Math.max(
+      hintWidth,
+      ...state.colHints.map((hints) => {
+        const totalTextHeight = hints.length * fontSize;
+        const totalSpacing = Math.max(0, hints.length - 1) * verticalSpacing;
+        return Math.ceil(totalTextHeight + totalSpacing + verticalPadding * 2);
+      })
+    );
+
+    return {
+      cellSize,
+      gap,
+      size,
+      rowHintWidth,
+      colHintHeight,
+      rowHintTextX: rowHintWidth - horizontalPadding,
+      colHintTextBottomY: colHintHeight - verticalPadding,
+      gridOffsetX: rowHintWidth + gap,
+      gridOffsetY: colHintHeight + gap,
+      gridSpan: size * (cellSize + gap)
+    };
+  }
+
   // 根据游戏状态调整 Canvas 大小
   private resizeCanvas(state: GameState): void {
-    const { cellSize, hintWidth, gap } = this.config;
-    const size = state.grid.length;
-    
-    const totalWidth = hintWidth + gap + size * (cellSize + gap);
-    const totalHeight = hintWidth + gap + size * (cellSize + gap);
+    const layout = this.getLayoutMetrics(state);
+    const totalWidth = layout.rowHintWidth + layout.gap + layout.gridSpan;
+    const totalHeight = layout.colHintHeight + layout.gap + layout.gridSpan;
 
     this.canvas.style.width = `${totalWidth}px`;
     this.canvas.style.height = `${totalHeight}px`;
@@ -71,8 +114,8 @@ export class Renderer {
     this.resizeCanvas(state);
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    const { cellSize, hintWidth, gap, colors } = this.config;
-    const size = state.grid.length;
+    const { colors } = this.config;
+    const layout = this.getLayoutMetrics(state);
 
     // 绘制背景
     this.ctx.fillStyle = colors.background;
@@ -80,45 +123,47 @@ export class Renderer {
 
     // 绘制提示区域背景
     this.ctx.fillStyle = colors.cell;
-    this.ctx.fillRect(hintWidth + gap, 0, size * (cellSize + gap), hintWidth);
-    this.ctx.fillRect(0, hintWidth + gap, hintWidth, size * (cellSize + gap));
+    this.ctx.fillRect(layout.gridOffsetX, 0, layout.gridSpan, layout.colHintHeight);
+    this.ctx.fillRect(0, layout.gridOffsetY, layout.rowHintWidth, layout.gridSpan);
 
     // 绘制行提示
-    this.renderRowHints(state);
+    this.renderRowHints(state, layout);
 
     // 绘制列提示
-    this.renderColHints(state);
+    this.renderColHints(state, layout);
 
     // 绘制网格
-    this.renderGrid(state);
+    this.renderGrid(state, layout);
 
     // 绘制单元格
-    this.renderCells(state);
+    this.renderCells(state, layout);
 
     // 如果已完成，绘制边框
     if (state.isComplete) {
-      this.renderCompletionBorder(state);
+      this.renderCompletionBorder(state, layout);
     }
   }
 
   // 绘制行提示
-  private renderRowHints(state: GameState): void {
-    const { cellSize, hintWidth, gap, colors } = this.config;
-    const fontSize = Math.floor(cellSize * 0.6);
+  private renderRowHints(
+    state: GameState,
+    layout: ReturnType<Renderer['getLayoutMetrics']>
+  ): void {
+    const { colors } = this.config;
+    const spacing = this.getHintHorizontalSpacing();
 
-    this.ctx.font = `${fontSize}px Arial`;
+    this.ctx.font = `${this.getHintFontSize()}px Arial`;
     this.ctx.textAlign = 'right';
     this.ctx.textBaseline = 'middle';
 
     state.rowHints.forEach((hints, row) => {
-      const y = hintWidth + gap + row * (cellSize + gap) + cellSize / 2;
-      const x = hintWidth - 5;
+      const y = layout.gridOffsetY + row * (layout.cellSize + layout.gap) + layout.cellSize / 2;
+      const x = layout.rowHintTextX;
       const completed = this.getCompletedHints(
         state.grid[row],
         state.solution[row],
         hints
       );
-      const spacing = Math.max(4, Math.floor(fontSize * 0.35));
       let currentX = x;
 
       for (let i = hints.length - 1; i >= 0; i--) {
@@ -131,26 +176,44 @@ export class Renderer {
   }
 
   // 绘制列提示
-  private renderColHints(state: GameState): void {
-    const { cellSize, hintWidth, gap, colors } = this.config;
-    const fontSize = Math.floor(cellSize * 0.5);
+  private renderColHints(
+    state: GameState,
+    layout: ReturnType<Renderer['getLayoutMetrics']>
+  ): void {
+    const { colors } = this.config;
+    const fontSize = this.getHintFontSize();
+    const verticalSpacing = this.getHintVerticalSpacing();
 
     this.ctx.font = `${fontSize}px Arial`;
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'bottom';
 
     state.colHints.forEach((hints, col) => {
-      const x = hintWidth + gap + col * (cellSize + gap) + cellSize / 2;
+      const x = layout.gridOffsetX + col * (layout.cellSize + layout.gap) + layout.cellSize / 2;
       const lineStates = state.grid.map((row) => row[col]);
       const solutionLine = state.solution.map((row) => row[col]);
       const completed = this.getCompletedHints(lineStates, solutionLine, hints);
 
       hints.forEach((hint, index) => {
-        const y = hintWidth - 3 - (hints.length - 1 - index) * (cellSize * 0.5);
+        const y = layout.colHintTextBottomY - (hints.length - 1 - index) * (fontSize + verticalSpacing);
         this.ctx.fillStyle = completed[index] ? colors.hintCompleted : colors.hint;
         this.ctx.fillText(String(hint), x, y);
       });
     });
+  }
+
+  private getHintFontSize(): number {
+    return Math.floor(this.config.cellSize * 0.6);
+  }
+
+  private getHintHorizontalSpacing(): number {
+    const fontSize = this.getHintFontSize();
+    return Math.max(4, Math.floor(fontSize * 0.3));
+  }
+
+  private getHintVerticalSpacing(): number {
+    const fontSize = this.getHintFontSize();
+    return Math.max(2, Math.floor(fontSize * 0.2));
   }
 
   private getCompletedHints(
@@ -273,8 +336,11 @@ export class Renderer {
   }
 
   // 绘制网格线
-  private renderGrid(state: GameState): void {
-    const { cellSize, hintWidth, gap, colors } = this.config;
+  private renderGrid(
+    state: GameState,
+    layout: ReturnType<Renderer['getLayoutMetrics']>
+  ): void {
+    const { colors } = this.config;
     const size = state.grid.length;
 
     this.ctx.strokeStyle = colors.grid;
@@ -282,19 +348,19 @@ export class Renderer {
 
     // 绘制垂直线
     for (let i = 0; i <= size; i++) {
-      const x = hintWidth + gap + i * (cellSize + gap);
+      const x = layout.gridOffsetX + i * (layout.cellSize + layout.gap);
       this.ctx.beginPath();
-      this.ctx.moveTo(x, hintWidth + gap);
-      this.ctx.lineTo(x, hintWidth + gap + size * (cellSize + gap));
+      this.ctx.moveTo(x, layout.gridOffsetY);
+      this.ctx.lineTo(x, layout.gridOffsetY + layout.gridSpan);
       this.ctx.stroke();
     }
 
     // 绘制水平线
     for (let i = 0; i <= size; i++) {
-      const y = hintWidth + gap + i * (cellSize + gap);
+      const y = layout.gridOffsetY + i * (layout.cellSize + layout.gap);
       this.ctx.beginPath();
-      this.ctx.moveTo(hintWidth + gap, y);
-      this.ctx.lineTo(hintWidth + gap + size * (cellSize + gap), y);
+      this.ctx.moveTo(layout.gridOffsetX, y);
+      this.ctx.lineTo(layout.gridOffsetX + layout.gridSpan, y);
       this.ctx.stroke();
     }
 
@@ -304,70 +370,74 @@ export class Renderer {
 
     for (let i = 0; i <= size; i += 5) {
       if (i > 0 && i < size) {
-        const x = hintWidth + gap + i * (cellSize + gap);
+        const x = layout.gridOffsetX + i * (layout.cellSize + layout.gap);
         this.ctx.beginPath();
-        this.ctx.moveTo(x, hintWidth + gap);
-        this.ctx.lineTo(x, hintWidth + gap + size * (cellSize + gap));
+        this.ctx.moveTo(x, layout.gridOffsetY);
+        this.ctx.lineTo(x, layout.gridOffsetY + layout.gridSpan);
         this.ctx.stroke();
 
-        const y = hintWidth + gap + i * (cellSize + gap);
+        const y = layout.gridOffsetY + i * (layout.cellSize + layout.gap);
         this.ctx.beginPath();
-        this.ctx.moveTo(hintWidth + gap, y);
-        this.ctx.lineTo(hintWidth + gap + size * (cellSize + gap), y);
+        this.ctx.moveTo(layout.gridOffsetX, y);
+        this.ctx.lineTo(layout.gridOffsetX + layout.gridSpan, y);
         this.ctx.stroke();
       }
     }
   }
 
   // 绘制单元格
-  private renderCells(state: GameState): void {
-    const { cellSize, hintWidth, gap, colors } = this.config;
+  private renderCells(
+    state: GameState,
+    layout: ReturnType<Renderer['getLayoutMetrics']>
+  ): void {
+    const { colors } = this.config;
     const size = state.grid.length;
 
     for (let row = 0; row < size; row++) {
       for (let col = 0; col < size; col++) {
         const cellState = state.grid[row][col];
-        const x = hintWidth + gap + col * (cellSize + gap);
-        const y = hintWidth + gap + row * (cellSize + gap);
+        const x = layout.gridOffsetX + col * (layout.cellSize + layout.gap);
+        const y = layout.gridOffsetY + row * (layout.cellSize + layout.gap);
         const isCorrected = state.correctedCells[row][col];
 
         if (cellState === CellState.FILLED) {
           // 绘制填充
           this.ctx.fillStyle = isCorrected ? colors.correction : colors.filled;
-          this.ctx.fillRect(x + 1, y + 1, cellSize - 1, cellSize - 1);
+          this.ctx.fillRect(x + 1, y + 1, layout.cellSize - 1, layout.cellSize - 1);
         } else if (cellState === CellState.MARKED) {
           // 绘制X标记
           this.ctx.strokeStyle = isCorrected ? colors.correction : colors.marked;
           this.ctx.lineWidth = 2;
           
-          const padding = cellSize * 0.25;
+          const padding = layout.cellSize * 0.25;
           this.ctx.beginPath();
           this.ctx.moveTo(x + padding, y + padding);
-          this.ctx.lineTo(x + cellSize - padding, y + cellSize - padding);
-          this.ctx.moveTo(x + cellSize - padding, y + padding);
-          this.ctx.lineTo(x + padding, y + cellSize - padding);
+          this.ctx.lineTo(x + layout.cellSize - padding, y + layout.cellSize - padding);
+          this.ctx.moveTo(x + layout.cellSize - padding, y + padding);
+          this.ctx.lineTo(x + padding, y + layout.cellSize - padding);
           this.ctx.stroke();
         } else {
           // 绘制空白背景
           this.ctx.fillStyle = colors.cell;
-          this.ctx.fillRect(x + 1, y + 1, cellSize - 1, cellSize - 1);
+          this.ctx.fillRect(x + 1, y + 1, layout.cellSize - 1, layout.cellSize - 1);
         }
       }
     }
   }
 
   // 绘制完成边框
-  private renderCompletionBorder(state: GameState): void {
-    const { cellSize, hintWidth, gap, colors } = this.config;
-    const size = state.grid.length;
-
+  private renderCompletionBorder(
+    _state: GameState,
+    layout: ReturnType<Renderer['getLayoutMetrics']>
+  ): void {
+    const { colors } = this.config;
     this.ctx.strokeStyle = colors.completed;
     this.ctx.lineWidth = 4;
 
-    const x = hintWidth + gap;
-    const y = hintWidth + gap;
-    const width = size * (cellSize + gap);
-    const height = size * (cellSize + gap);
+    const x = layout.gridOffsetX;
+    const y = layout.gridOffsetY;
+    const width = layout.gridSpan;
+    const height = layout.gridSpan;
 
     this.ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
   }
@@ -378,15 +448,12 @@ export class Renderer {
     const x = mouseX - rect.left;
     const y = mouseY - rect.top;
 
-    const { cellSize, hintWidth, gap } = this.config;
-
-    const col = Math.floor((x - hintWidth - gap) / (cellSize + gap));
-    const row = Math.floor((y - hintWidth - gap) / (cellSize + gap));
+    const layout = this.getLayoutMetricsFromCanvas(rect.width, rect.height);
+    const col = Math.floor((x - layout.gridOffsetX) / (layout.cellStep));
+    const row = Math.floor((y - layout.gridOffsetY) / (layout.cellStep));
 
     // 检查是否在有效范围内
-    const size = Math.floor((rect.width - hintWidth - gap) / (cellSize + gap));
-    
-    if (row >= 0 && row < size && col >= 0 && col < size) {
+    if (row >= 0 && row < layout.size && col >= 0 && col < layout.size) {
       return { row, col };
     }
 
@@ -396,5 +463,23 @@ export class Renderer {
   // 更新配置
   public updateConfig(config: Partial<RenderConfig>): void {
     this.config = { ...this.config, ...config };
+  }
+
+  private getLayoutMetricsFromCanvas(width: number, height: number) {
+    const { cellSize, gap, hintWidth } = this.config;
+    const cellStep = cellSize + gap;
+    const sizeFromWidth = Math.floor((width - hintWidth - gap) / cellStep);
+    const sizeFromHeight = Math.floor((height - hintWidth - gap) / cellStep);
+    const size = Math.min(sizeFromWidth, sizeFromHeight);
+    const gridSpan = size * cellStep;
+    const rowHintWidth = Math.max(hintWidth, Math.round(width - gap - gridSpan));
+    const colHintHeight = Math.max(hintWidth, Math.round(height - gap - gridSpan));
+
+    return {
+      size,
+      cellStep,
+      gridOffsetX: rowHintWidth + gap,
+      gridOffsetY: colHintHeight + gap
+    };
   }
 }
