@@ -5,66 +5,129 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>数织游戏 - Nonogram</title>
-    <script type="module" crossorigin src="/assets/index-CxxsWP7c.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CumHmD14.css">
+    <script type="module" crossorigin src="/assets/index-Coa33hTt.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DVqvR0J_.css">
   </head>
-  <body>
+  <body data-theme="ink">
     <div id="app">
-      <header class="header">
-        <h1>🎮 数织游戏</h1>
-        <div class="header-controls">
-          <button id="btn-menu" class="btn">菜单</button>
-        </div>
-      </header>
-      
-      <main class="game-container">
-        <div class="game-board-wrapper">
-          <canvas id="game-canvas"></canvas>
-        </div>
-        
-        <aside class="sidebar">
-          <div class="panel">
-            <h3>游戏模式</h3>
-            <div class="mode-toggle">
-              <button id="mode-free" class="btn">自由模式</button>
-              <button id="mode-assist" class="btn active">纠错模式</button>
-            </div>
+      <aside class="app-sidebar">
+        <div class="brand">
+          <div class="brand-mark">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
           </div>
+          <div class="brand-copy">
+            <strong>nonogram</strong>
+            <span>logic studio</span>
+          </div>
+        </div>
 
-          <div class="panel">
-            <h3>操作模式</h3>
-            <div class="mode-toggle">
-              <button id="mode-fill" class="btn active">填充 ■</button>
-              <button id="mode-mark" class="btn">标记 ✕</button>
+        <nav class="nav-section">
+          <button class="nav-item">
+            <span class="nav-icon">⌂</span>
+            <span>首页</span>
+          </button>
+          <button class="nav-item">
+            <span class="nav-icon">◫</span>
+            <span>每日挑战</span>
+          </button>
+          <button class="nav-item active">
+            <span class="nav-icon">▦</span>
+            <span>开始游戏</span>
+          </button>
+          <button class="nav-item">
+            <span class="nav-icon">✦</span>
+            <span>图鉴收藏</span>
+          </button>
+          <button class="nav-item">
+            <span class="nav-icon">?</span>
+            <span>玩法说明</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-card">
+          <p class="sidebar-label">今日推荐</p>
+          <h2>Chapter 5</h2>
+          <p>从 5x5 到 15x15，逐步解锁更复杂的像素谜题。</p>
+          <button id="btn-menu" class="btn btn-accent">选择谜题</button>
+        </div>
+
+        <div class="sidebar-footer">
+          <button class="ghost-link">设置</button>
+          <button class="ghost-link">控制说明</button>
+        </div>
+      </aside>
+
+      <main class="playground">
+        <section class="board-stage">
+          <header class="stage-topbar">
+            <div>
+              <p class="eyebrow">逻辑填图</p>
+              <h1>数织游戏 - Nonogram</h1>
             </div>
-          </div>
-          
-          <div class="panel">
-            <h3>控制</h3>
-            <div class="controls">
-              <button id="btn-undo" class="btn" disabled>撤销 ↩</button>
-              <button id="btn-redo" class="btn" disabled>重做 ↪</button>
-              <button id="btn-clear" class="btn">清空 ⟲</button>
+            <div class="header-controls">
+              <button id="mode-free" class="btn stage-chip">自由模式</button>
+              <button id="mode-assist" class="btn stage-chip active">纠错模式</button>
             </div>
-          </div>
-          
-          <div class="panel">
-            <h3>进度</h3>
-            <div class="stats">
-              <div class="stat">
-                <span class="label">时间:</span>
-                <span id="timer">00:00</span>
+          </header>
+
+          <div class="board-shell">
+            <div class="board-meta">
+              <div class="meta-pill">
+                <span>当前操作</span>
+                <strong id="current-tool-label">填充模式</strong>
               </div>
-              <div class="stat">
-                <span class="label">完成度:</span>
-                <span id="progress">0%</span>
+              <div class="meta-pill">
+                <span>谜题类型</span>
+                <strong>像素图案</strong>
               </div>
             </div>
+
+            <div class="game-board-wrapper">
+              <canvas id="game-canvas"></canvas>
+            </div>
+
+            <footer class="board-footer">
+              <div class="board-status">
+                <span>计时</span>
+                <strong id="timer">00:00</strong>
+              </div>
+              <div class="board-status">
+                <span>完成度</span>
+                <strong id="progress">0%</strong>
+              </div>
+              <div class="board-status">
+                <span>快捷键</span>
+                <strong>Space / Z / R</strong>
+              </div>
+            </footer>
           </div>
+        </section>
+
+        <aside class="control-rail">
+          <section class="rail-toolbar">
+            <button id="btn-undo" class="icon-btn" disabled aria-label="撤销">↺</button>
+            <button id="btn-redo" class="icon-btn" disabled aria-label="重做">↻</button>
+            <button id="btn-clear" class="icon-btn" aria-label="清空">⌫</button>
+          </section>
+
+          <section class="rail-panel">
+            <div class="panel-heading">
+              <p class="eyebrow">输入方式</p>
+              <h3>操作面板</h3>
+            </div>
+            <div class="mode-stack">
+              <button id="mode-fill" class="btn tool-btn active">填充 ■</button>
+              <button id="mode-mark" class="btn tool-btn">标记 ✕</button>
+            </div>
+            <p class="panel-note">左键和拖拽会按当前工具连续填写，适合快速清图。</p>
+          </section>
+
         </aside>
       </main>
-      
-      <!-- 菜单模态框 -->
+
       <div id="menu-modal" class="modal hidden">
         <div class="modal-content">
           <h2>选择谜题</h2>
@@ -78,12 +141,11 @@
           <button id="btn-close-menu" class="btn close-btn">关闭</button>
         </div>
       </div>
-      
-      <!-- 胜利弹窗 -->
+
       <div id="win-modal" class="modal hidden">
         <div class="modal-content">
-          <h2>🎉 恭喜完成!</h2>
-          <p>你成功解开了这个谜题!</p>
+          <h2>恭喜完成</h2>
+          <p>你已经解开了当前像素谜题。</p>
           <div class="win-stats">
             <p>用时: <span id="win-time">00:00</span></p>
           </div>
@@ -92,6 +154,6 @@
         </div>
       </div>
     </div>
-    
+
   </body>
 </html>

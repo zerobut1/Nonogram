@@ -50,10 +50,23 @@ export class Renderer {
   }
 
   private getLayoutMetrics(state: GameState) {
-    const { cellSize, hintWidth, gap } = this.config;
-    const fontSize = this.getHintFontSize();
-    const horizontalSpacing = this.getHintHorizontalSpacing();
-    const verticalSpacing = this.getHintVerticalSpacing();
+    return this.getLayoutMetricsWithSizing(
+      state,
+      this.config.cellSize,
+      this.config.hintWidth,
+      this.config.gap
+    );
+  }
+
+  private getLayoutMetricsWithSizing(
+    state: GameState,
+    cellSize: number,
+    hintWidth: number,
+    gap: number
+  ) {
+    const fontSize = this.getHintFontSize(cellSize);
+    const horizontalSpacing = this.getHintHorizontalSpacing(cellSize);
+    const verticalSpacing = this.getHintVerticalSpacing(cellSize);
     const horizontalPadding = Math.max(10, Math.floor(cellSize * 0.3));
     const verticalPadding = Math.max(10, Math.floor(cellSize * 0.3));
     const size = state.grid.length;
@@ -90,7 +103,9 @@ export class Renderer {
       colHintTextBottomY: colHintHeight - verticalPadding,
       gridOffsetX: rowHintWidth + gap,
       gridOffsetY: colHintHeight + gap,
-      gridSpan: size * (cellSize + gap)
+      gridSpan: size * (cellSize + gap),
+      totalWidth: rowHintWidth + gap + size * (cellSize + gap),
+      totalHeight: colHintHeight + gap + size * (cellSize + gap)
     };
   }
 
@@ -111,6 +126,8 @@ export class Renderer {
 
   // 渲染游戏状态
   public render(state: GameState): void {
+    this.syncThemeColors();
+    this.syncResponsiveSizing(state);
     this.resizeCanvas(state);
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -142,6 +159,57 @@ export class Renderer {
     if (state.isComplete) {
       this.renderCompletionBorder(state, layout);
     }
+  }
+
+  private syncThemeColors(): void {
+    const rootStyle = getComputedStyle(document.body);
+
+    this.config.colors = {
+      ...this.config.colors,
+      background: this.getThemeColor(rootStyle, '--canvas-bg', this.config.colors.background),
+      grid: this.getThemeColor(rootStyle, '--canvas-grid', this.config.colors.grid),
+      cell: this.getThemeColor(rootStyle, '--canvas-cell', this.config.colors.cell),
+      filled: this.getThemeColor(rootStyle, '--canvas-fill', this.config.colors.filled),
+      marked: this.getThemeColor(rootStyle, '--canvas-mark', this.config.colors.marked)
+    };
+  }
+
+  private getThemeColor(style: CSSStyleDeclaration, name: string, fallback: string): string {
+    const value = style.getPropertyValue(name).trim();
+    return value || fallback;
+  }
+
+  private syncResponsiveSizing(state: GameState): void {
+    const parent = this.canvas.parentElement;
+
+    if (!parent) {
+      return;
+    }
+
+    const parentStyle = getComputedStyle(parent);
+    const horizontalPadding =
+      parseFloat(parentStyle.paddingLeft) + parseFloat(parentStyle.paddingRight);
+    const verticalPadding =
+      parseFloat(parentStyle.paddingTop) + parseFloat(parentStyle.paddingBottom);
+    const availableWidth = Math.max(280, parent.clientWidth - horizontalPadding);
+    const availableHeight = Math.max(280, parent.clientHeight - verticalPadding);
+
+    let nextCellSize = 14;
+    let nextHintWidth = 26;
+
+    for (let cellSize = 34; cellSize >= 14; cellSize--) {
+      const hintWidth = Math.max(26, Math.round(cellSize * 1.35));
+      const layout = this.getLayoutMetricsWithSizing(state, cellSize, hintWidth, this.config.gap);
+
+      if (layout.totalWidth <= availableWidth && layout.totalHeight <= availableHeight) {
+        nextCellSize = cellSize;
+        nextHintWidth = hintWidth;
+        break;
+      }
+    }
+
+    this.config.cellSize = nextCellSize;
+    this.config.hintWidth = nextHintWidth;
   }
 
   // 绘制行提示
@@ -202,17 +270,17 @@ export class Renderer {
     });
   }
 
-  private getHintFontSize(): number {
-    return Math.floor(this.config.cellSize * 0.6);
+  private getHintFontSize(cellSize: number = this.config.cellSize): number {
+    return Math.floor(cellSize * 0.6);
   }
 
-  private getHintHorizontalSpacing(): number {
-    const fontSize = this.getHintFontSize();
+  private getHintHorizontalSpacing(cellSize: number = this.config.cellSize): number {
+    const fontSize = this.getHintFontSize(cellSize);
     return Math.max(4, Math.floor(fontSize * 0.3));
   }
 
-  private getHintVerticalSpacing(): number {
-    const fontSize = this.getHintFontSize();
+  private getHintVerticalSpacing(cellSize: number = this.config.cellSize): number {
+    const fontSize = this.getHintFontSize(cellSize);
     return Math.max(2, Math.floor(fontSize * 0.2));
   }
 

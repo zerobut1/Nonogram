@@ -28,6 +28,7 @@ const modeFill = document.getElementById('mode-fill') as HTMLButtonElement;
 const modeMark = document.getElementById('mode-mark') as HTMLButtonElement;
 const timerDisplay = document.getElementById('timer') as HTMLSpanElement;
 const progressDisplay = document.getElementById('progress') as HTMLSpanElement;
+const currentToolLabel = document.getElementById('current-tool-label') as HTMLSpanElement;
 const menuModal = document.getElementById('menu-modal') as HTMLDivElement;
 const winModal = document.getElementById('win-modal') as HTMLDivElement;
 const btnCloseMenu = document.getElementById('btn-close-menu') as HTMLButtonElement;
@@ -86,6 +87,7 @@ function updateUI(): void {
   
   // 更新进度
   progressDisplay.textContent = `${game.getProgress()}%`;
+  currentToolLabel.textContent = isFillMode ? '填充模式' : '标记模式';
 }
 
 // 设置 Canvas 事件
@@ -163,6 +165,8 @@ function setFillMode(fill: boolean): void {
     modeFill.classList.remove('active');
     modeMark.classList.add('active');
   }
+
+  currentToolLabel.textContent = fill ? '填充模式' : '标记模式';
 }
 
 function setGameMode(mode: GameMode): void {
