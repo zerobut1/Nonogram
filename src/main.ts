@@ -1,7 +1,7 @@
 import { Game } from './core/Game';
 import { Renderer } from './ui/Renderer';
 import { PRESETS, getPuzzlesByDifficulty } from './data/presets';
-import { Position } from './types/index';
+import { Position, CellState, GameMode } from './types/index';
 import './style.css';
 
 // 游戏实例
@@ -9,6 +9,8 @@ let game: Game | null = null;
 let renderer: Renderer | null = null;
 
 // 状态
+let currentPuzzleIndex = 0;
+let currentGameMode: GameMode = 'assist';
 let isFillMode = true;
 let isDragging = false;
 let dragState: 'fill' | 'mark' | null = null;
@@ -20,6 +22,8 @@ const btnMenu = document.getElementById('btn-menu') as HTMLButtonElement;
 const btnUndo = document.getElementById('btn-undo') as HTMLButtonElement;
 const btnRedo = document.getElementById('btn-redo') as HTMLButtonElement;
 const btnClear = document.getElementById('btn-clear') as HTMLButtonElement;
+const modeFree = document.getElementById('mode-free') as HTMLButtonElement;
+const modeAssist = document.getElementById('mode-assist') as HTMLButtonElement;
 const modeFill = document.getElementById('mode-fill') as HTMLButtonElement;
 const modeMark = document.getElementById('mode-mark') as HTMLButtonElement;
 const timerDisplay = document.getElementById('timer') as HTMLSpanElement;
@@ -34,13 +38,16 @@ const puzzleList = document.getElementById('puzzle-list') as HTMLDivElement;
 
 // 初始化游戏
 function initGame(puzzleIndex: number = 0): void {
+  currentPuzzleIndex = puzzleIndex;
+  resetDragState();
+
   // 停止旧游戏
   if (game) {
     game.stopTimer();
   }
 
   // 创建新游戏
-  game = new Game(PRESETS[puzzleIndex]);
+  game = new Game(PRESETS[puzzleIndex], { mode: currentGameMode });
   
   // 创建渲染器
   if (!renderer) {
@@ -69,8 +76,6 @@ function initGame(puzzleIndex: number = 0): void {
 // 更新 UI
 function updateUI(): void {
   if (!game) return;
-
-  const state = game.getState();
   
   // 更新按钮状态
   btnUndo.disabled = !game.canUndo();
@@ -104,6 +109,9 @@ function setupCanvasEvents(): void {
         
         // 切换当前格子
         game?.toggleCell(pos, useFillMode);
+        if (game?.isInputLocked()) {
+          resetDragState();
+        }
       }
     }
   });
@@ -111,26 +119,38 @@ function setupCanvasEvents(): void {
   // 鼠标移动
   canvas.addEventListener('mousemove', (e) => {
     if (isDragging && dragState && lastCell) {
+      if (game?.isInputLocked()) {
+        resetDragState();
+        return;
+      }
+
       const pos = renderer?.getCellFromPosition(e.clientX, e.clientY);
       if (pos && (pos.row !== lastCell.row || pos.col !== lastCell.col)) {
         lastCell = pos;
-        const newState = dragState === 'fill' ? 1 : 2; // FILLED or MARKED
+        const newState = dragState === 'fill' ? CellState.FILLED : CellState.MARKED;
         game?.setCell(pos, newState);
+        if (game?.isInputLocked()) {
+          resetDragState();
+        }
       }
     }
   });
 
   // 鼠标松开
   window.addEventListener('mouseup', () => {
-    isDragging = false;
-    dragState = null;
-    lastCell = null;
+    resetDragState();
   });
 
   // 禁用右键菜单
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
   });
+}
+
+function resetDragState(): void {
+  isDragging = false;
+  dragState = null;
+  lastCell = null;
 }
 
 // 切换模式
@@ -143,6 +163,20 @@ function setFillMode(fill: boolean): void {
     modeFill.classList.remove('active');
     modeMark.classList.add('active');
   }
+}
+
+function setGameMode(mode: GameMode): void {
+  currentGameMode = mode;
+
+  if (mode === 'assist') {
+    modeAssist.classList.add('active');
+    modeFree.classList.remove('active');
+  } else {
+    modeAssist.classList.remove('active');
+    modeFree.classList.add('active');
+  }
+
+  initGame(currentPuzzleIndex);
 }
 
 // 显示菜单
@@ -161,7 +195,7 @@ function renderPuzzleList(difficulty: 'all' | 'easy' | 'medium' | 'hard'): void 
   const puzzles = getPuzzlesByDifficulty(difficulty);
   puzzleList.innerHTML = '';
   
-  puzzles.forEach((puzzle, index) => {
+  puzzles.forEach((puzzle) => {
     const card = document.createElement('div');
     card.className = 'puzzle-card';
     
@@ -249,13 +283,15 @@ btnCloseMenu.addEventListener('click', hideMenu);
 btnUndo.addEventListener('click', () => game?.undo());
 btnRedo.addEventListener('click', () => game?.redo());
 btnClear.addEventListener('click', () => game?.clear());
+modeFree.addEventListener('click', () => setGameMode('free'));
+modeAssist.addEventListener('click', () => setGameMode('assist'));
 modeFill.addEventListener('click', () => setFillMode(true));
 modeMark.addEventListener('click', () => setFillMode(false));
 btnCloseWin.addEventListener('click', hideWinModal);
 btnNext.addEventListener('click', nextPuzzle);
 
 // 难度标签切换
-const tabs = document.querySelectorAll('.difficulty-tabs .tab');
+const tabs = document.querySelectorAll<HTMLButtonElement>('.difficulty-tabs .tab');
 tabs.forEach(tab => {
   tab.addEventListener('click', () => {
     tabs.forEach(t => t.classList.remove('active'));

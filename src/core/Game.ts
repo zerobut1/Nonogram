@@ -1,14 +1,23 @@
-import { Position, CellState, HistoryAction, GameState, PresetPuzzle } from '../types/index';
+import { Position, CellState, GameState, PresetPuzzle, GameMode } from '../types/index';
+
+const CORRECTION_DELAY_MS = 200;
+
+interface GameOptions {
+  mode?: GameMode;
+}
 
 export class Game {
   private state: GameState;
   private onStateChangeCallbacks: ((state: GameState) => void)[] = [];
   private onWinCallbacks: (() => void)[] = [];
   private timerInterval: number | null = null;
+  private correctionTimer: number | null = null;
+  private inputLocked = false;
 
-  constructor(puzzle: PresetPuzzle) {
+  constructor(puzzle: PresetPuzzle, options: GameOptions = {}) {
     const size = puzzle.solution.length;
-    
+    const mode = options.mode ?? 'assist';
+
     this.state = {
       grid: Array(size).fill(null).map(() => Array(size).fill(CellState.EMPTY)),
       solution: puzzle.solution,
@@ -18,7 +27,9 @@ export class Game {
       historyIndex: -1,
       isComplete: false,
       startTime: Date.now(),
-      elapsedTime: 0
+      elapsedTime: 0,
+      correctedCells: Array(size).fill(null).map(() => Array(size).fill(false)),
+      mode
     };
 
     this.startTimer();
@@ -35,14 +46,12 @@ export class Game {
 
       for (let j = 0; j < size; j++) {
         const value = isRow ? solution[i][j] : solution[j][i];
-        
+
         if (value) {
           count++;
-        } else {
-          if (count > 0) {
-            line.push(count);
-            count = 0;
-          }
+        } else if (count > 0) {
+          line.push(count);
+          count = 0;
         }
       }
 
@@ -50,7 +59,6 @@ export class Game {
         line.push(count);
       }
 
-      // 如果没有填充，提示为 0
       if (line.length === 0) {
         line.push(0);
       }
@@ -77,41 +85,42 @@ export class Game {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
     }
+
+    this.clearCorrectionTimer();
   }
 
   // 设置单元格状态
   public setCell(pos: Position, state: CellState): void {
     if (this.state.isComplete) return;
+    if (this.inputLocked) return;
     if (!this.isValidPosition(pos)) return;
 
     const currentState = this.state.grid[pos.row][pos.col];
     if (currentState === state) return;
 
-    // 保存到历史
-    this.addToHistory([pos], [currentState], [state]);
+    if (this.state.mode === 'assist') {
+      const correctionState = this.getCorrectionState(pos, state);
+      if (correctionState !== null) {
+        this.applyIncorrectMove(pos, currentState, state, correctionState);
+        return;
+      }
+    }
 
-    // 更新状态
-    this.state.grid[pos.row][pos.col] = state;
-    
-    // 检查胜利
-    this.checkWin();
-    
-    this.notifyStateChange();
+    this.applyCellChange(pos, currentState, state, false);
   }
 
   // 切换单元格状态（用于单击）
   public toggleCell(pos: Position, isFillMode: boolean): void {
     if (this.state.isComplete) return;
+    if (this.inputLocked) return;
     if (!this.isValidPosition(pos)) return;
 
     const currentState = this.state.grid[pos.row][pos.col];
     let newState: CellState;
 
     if (isFillMode) {
-      // 填充模式：EMPTY -> FILLED -> EMPTY
       newState = currentState === CellState.FILLED ? CellState.EMPTY : CellState.FILLED;
     } else {
-      // 标记模式：EMPTY -> MARKED -> EMPTY
       newState = currentState === CellState.MARKED ? CellState.EMPTY : CellState.MARKED;
     }
 
@@ -121,67 +130,33 @@ export class Game {
   // 批量设置单元格（用于拖拽）
   public setCells(positions: Position[], state: CellState): void {
     if (this.state.isComplete) return;
+    if (this.inputLocked) return;
     if (positions.length === 0) return;
 
-    const validPositions: Position[] = [];
-    const oldStates: CellState[] = [];
-
     for (const pos of positions) {
-      if (this.isValidPosition(pos)) {
-        const currentState = this.state.grid[pos.row][pos.col];
-        if (currentState !== state) {
-          validPositions.push(pos);
-          oldStates.push(currentState);
-        }
+      this.setCell(pos, state);
+      if (this.inputLocked) {
+        break;
       }
     }
-
-    if (validPositions.length === 0) return;
-
-    // 保存到历史
-    const newStates = Array(validPositions.length).fill(state);
-    this.addToHistory(validPositions, oldStates, newStates);
-
-    // 更新状态
-    for (const pos of validPositions) {
-      this.state.grid[pos.row][pos.col] = state;
-    }
-
-    // 检查胜利
-    this.checkWin();
-
-    this.notifyStateChange();
-  }
-
-  // 添加到历史
-  private addToHistory(positions: Position[], oldStates: CellState[], newStates: CellState[]): void {
-    // 删除当前位置之后的历史
-    this.state.history = this.state.history.slice(0, this.state.historyIndex + 1);
-    
-    // 添加新操作
-    this.state.history.push({
-      positions,
-      oldStates,
-      newStates
-    });
-    
-    this.state.historyIndex++;
   }
 
   // 撤销
   public undo(): boolean {
     if (this.state.historyIndex < 0) return false;
+    if (this.inputLocked) return false;
 
     const action = this.state.history[this.state.historyIndex];
-    
+
     for (let i = 0; i < action.positions.length; i++) {
       const pos = action.positions[i];
       this.state.grid[pos.row][pos.col] = action.oldStates[i];
+      this.state.correctedCells[pos.row][pos.col] = action.oldCorrectedStates[i];
     }
 
     this.state.historyIndex--;
     this.state.isComplete = false;
-    
+
     this.notifyStateChange();
     return true;
   }
@@ -189,13 +164,15 @@ export class Game {
   // 重做
   public redo(): boolean {
     if (this.state.historyIndex >= this.state.history.length - 1) return false;
+    if (this.inputLocked) return false;
 
     this.state.historyIndex++;
     const action = this.state.history[this.state.historyIndex];
-    
+
     for (let i = 0; i < action.positions.length; i++) {
       const pos = action.positions[i];
       this.state.grid[pos.row][pos.col] = action.newStates[i];
+      this.state.correctedCells[pos.row][pos.col] = action.newCorrectedStates[i];
     }
 
     this.checkWin();
@@ -206,61 +183,37 @@ export class Game {
   // 清空网格
   public clear(): void {
     if (this.state.isComplete) return;
+    if (this.inputLocked) return;
 
     const size = this.state.grid.length;
     const positions: Position[] = [];
     const oldStates: CellState[] = [];
+    const newStates: CellState[] = [];
+    const oldCorrectedStates: boolean[] = [];
+    const newCorrectedStates: boolean[] = [];
 
     for (let row = 0; row < size; row++) {
       for (let col = 0; col < size; col++) {
-        if (this.state.grid[row][col] !== CellState.EMPTY) {
+        if (this.state.grid[row][col] !== CellState.EMPTY || this.state.correctedCells[row][col]) {
           positions.push({ row, col });
           oldStates.push(this.state.grid[row][col]);
+          newStates.push(CellState.EMPTY);
+          oldCorrectedStates.push(this.state.correctedCells[row][col]);
+          newCorrectedStates.push(false);
         }
       }
     }
 
     if (positions.length === 0) return;
 
-    this.addToHistory(positions, oldStates, Array(positions.length).fill(CellState.EMPTY));
+    this.addToHistory(positions, oldStates, newStates, oldCorrectedStates, newCorrectedStates);
 
     for (const pos of positions) {
       this.state.grid[pos.row][pos.col] = CellState.EMPTY;
+      this.state.correctedCells[pos.row][pos.col] = false;
     }
 
     this.notifyStateChange();
-  }
-
-  // 检查胜利
-  private checkWin(): boolean {
-    const size = this.state.grid.length;
-    
-    for (let row = 0; row < size; row++) {
-      for (let col = 0; col < size; col++) {
-        const isFilled = this.state.grid[row][col] === CellState.FILLED;
-        const shouldFill = this.state.solution[row][col];
-        
-        // 必须填充的必须已填充
-        if (shouldFill && !isFilled) {
-          this.state.isComplete = false;
-          return false;
-        }
-        
-        // 不能填充的不能已填充
-        if (!shouldFill && isFilled) {
-          this.state.isComplete = false;
-          return false;
-        }
-      }
-    }
-
-    if (!this.state.isComplete) {
-      this.state.isComplete = true;
-      this.stopTimer();
-      this.notifyWin();
-    }
-
-    return true;
   }
 
   // 验证位置是否有效
@@ -271,17 +224,25 @@ export class Game {
 
   // 获取当前状态
   public getState(): GameState {
-    return { ...this.state };
+    return {
+      ...this.state,
+      grid: this.state.grid.map((row) => [...row]),
+      solution: this.state.solution.map((row) => [...row]),
+      rowHints: this.state.rowHints.map((row) => [...row]),
+      colHints: this.state.colHints.map((row) => [...row]),
+      history: [...this.state.history],
+      correctedCells: this.state.correctedCells.map((row) => [...row])
+    };
   }
 
   // 是否可以撤销
   public canUndo(): boolean {
-    return this.state.historyIndex >= 0;
+    return !this.inputLocked && this.state.historyIndex >= 0;
   }
 
   // 是否可以重做
   public canRedo(): boolean {
-    return this.state.historyIndex < this.state.history.length - 1;
+    return !this.inputLocked && this.state.historyIndex < this.state.history.length - 1;
   }
 
   // 获取完成度
@@ -312,6 +273,11 @@ export class Game {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
 
+  // 当前是否处于纠错停顿中
+  public isInputLocked(): boolean {
+    return this.inputLocked;
+  }
+
   // 状态变化回调
   public onStateChange(callback: (state: GameState) => void): void {
     this.onStateChangeCallbacks.push(callback);
@@ -320,6 +286,113 @@ export class Game {
   // 胜利回调
   public onWin(callback: () => void): void {
     this.onWinCallbacks.push(callback);
+  }
+
+  // 检查胜利
+  private checkWin(): boolean {
+    const size = this.state.grid.length;
+
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
+        const isFilled = this.state.grid[row][col] === CellState.FILLED;
+        const shouldFill = this.state.solution[row][col];
+
+        if (shouldFill && !isFilled) {
+          this.state.isComplete = false;
+          return false;
+        }
+
+        if (!shouldFill && isFilled) {
+          this.state.isComplete = false;
+          return false;
+        }
+      }
+    }
+
+    if (!this.state.isComplete) {
+      this.state.isComplete = true;
+      this.stopTimer();
+      this.notifyWin();
+    }
+
+    return true;
+  }
+
+  private applyCellChange(
+    pos: Position,
+    oldState: CellState,
+    newState: CellState,
+    isCorrected: boolean
+  ): void {
+    const oldCorrectedState = this.state.correctedCells[pos.row][pos.col];
+    this.addToHistory([pos], [oldState], [newState], [oldCorrectedState], [isCorrected]);
+    this.state.grid[pos.row][pos.col] = newState;
+    this.state.correctedCells[pos.row][pos.col] = isCorrected;
+    this.checkWin();
+    this.notifyStateChange();
+  }
+
+  private getCorrectionState(pos: Position, state: CellState): CellState | null {
+    if (state === CellState.EMPTY) {
+      return null;
+    }
+
+    const shouldFill = this.state.solution[pos.row][pos.col];
+
+    if (shouldFill && state === CellState.MARKED) {
+      return CellState.FILLED;
+    }
+
+    if (!shouldFill && state === CellState.FILLED) {
+      return CellState.MARKED;
+    }
+
+    return null;
+  }
+
+  private applyIncorrectMove(
+    pos: Position,
+    previousState: CellState,
+    incorrectState: CellState,
+    correctionState: CellState
+  ): void {
+    this.clearCorrectionTimer();
+    this.inputLocked = true;
+    this.state.grid[pos.row][pos.col] = incorrectState;
+    this.notifyStateChange();
+
+    this.correctionTimer = window.setTimeout(() => {
+      this.correctionTimer = null;
+      this.inputLocked = false;
+      this.applyCellChange(pos, previousState, correctionState, true);
+    }, CORRECTION_DELAY_MS);
+  }
+
+  private addToHistory(
+    positions: Position[],
+    oldStates: CellState[],
+    newStates: CellState[],
+    oldCorrectedStates: boolean[],
+    newCorrectedStates: boolean[]
+  ): void {
+    this.state.history = this.state.history.slice(0, this.state.historyIndex + 1);
+    this.state.history.push({
+      positions,
+      oldStates,
+      newStates,
+      oldCorrectedStates,
+      newCorrectedStates
+    });
+    this.state.historyIndex++;
+  }
+
+  private clearCorrectionTimer(): void {
+    if (this.correctionTimer) {
+      clearTimeout(this.correctionTimer);
+      this.correctionTimer = null;
+    }
+
+    this.inputLocked = false;
   }
 
   // 通知状态变化

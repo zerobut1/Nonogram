@@ -11,11 +11,16 @@ export enum CellState {
   MARKED = 2,   // 标记X（确定不填充）
 }
 
+// 游戏模式
+export type GameMode = 'free' | 'assist';
+
 // 历史操作（用于撤销）
 export interface HistoryAction {
   positions: Position[];
   oldStates: CellState[];
   newStates: CellState[];
+  oldCorrectedStates: boolean[];
+  newCorrectedStates: boolean[];
 }
 
 // 游戏状态
@@ -29,6 +34,8 @@ export interface GameState {
   isComplete: boolean;           // 是否完成
   startTime: number;             // 开始时间
   elapsedTime: number;           // 经过时间（毫秒）
+  correctedCells: boolean[][];   // 被自动纠正且永久标红的格子
+  mode: GameMode;                // 当前游戏模式
 }
 
 // 预设题目
@@ -51,6 +58,7 @@ export interface RenderConfig {
     cell: string;
     filled: string;
     marked: string;
+    correction: string;
     hint: string;
     completed: string;
   };

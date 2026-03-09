@@ -28,6 +28,7 @@ export class Renderer {
         cell: '#f5f5f5',
         filled: '#333333',
         marked: '#999999',
+        correction: '#e53935',
         hint: '#333333',
         completed: '#4caf50'
       },
@@ -39,7 +40,6 @@ export class Renderer {
 
   // 设置 Canvas 尺寸
   private setupCanvas(): void {
-    const { cellSize, hintWidth } = this.config;
     // 先设置一个默认值，实际大小会在 render 时根据 state 调整
     this.canvas.style.width = '400px';
     this.canvas.style.height = '400px';
@@ -196,14 +196,15 @@ export class Renderer {
         const cellState = state.grid[row][col];
         const x = hintWidth + gap + col * (cellSize + gap);
         const y = hintWidth + gap + row * (cellSize + gap);
+        const isCorrected = state.correctedCells[row][col];
 
         if (cellState === CellState.FILLED) {
           // 绘制填充
-          this.ctx.fillStyle = colors.filled;
+          this.ctx.fillStyle = isCorrected ? colors.correction : colors.filled;
           this.ctx.fillRect(x + 1, y + 1, cellSize - 1, cellSize - 1);
         } else if (cellState === CellState.MARKED) {
           // 绘制X标记
-          this.ctx.strokeStyle = colors.marked;
+          this.ctx.strokeStyle = isCorrected ? colors.correction : colors.marked;
           this.ctx.lineWidth = 2;
           
           const padding = cellSize * 0.25;
