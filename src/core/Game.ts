@@ -324,12 +324,117 @@ export class Game {
     newState: CellState,
     isCorrected: boolean
   ): void {
-    const oldCorrectedState = this.state.correctedCells[pos.row][pos.col];
-    this.addToHistory([pos], [oldState], [newState], [oldCorrectedState], [isCorrected]);
+    const positions: Position[] = [{ ...pos }];
+    const oldStates: CellState[] = [oldState];
+    const newStates: CellState[] = [newState];
+    const oldCorrectedStates: boolean[] = [this.state.correctedCells[pos.row][pos.col]];
+    const newCorrectedStates: boolean[] = [isCorrected];
+
     this.state.grid[pos.row][pos.col] = newState;
     this.state.correctedCells[pos.row][pos.col] = isCorrected;
+
+    const autoMarkedPositions = this.getAutoMarkedPositions(pos);
+
+    for (const autoPos of autoMarkedPositions) {
+      positions.push(autoPos);
+      oldStates.push(this.state.grid[autoPos.row][autoPos.col]);
+      newStates.push(CellState.MARKED);
+      oldCorrectedStates.push(this.state.correctedCells[autoPos.row][autoPos.col]);
+      newCorrectedStates.push(false);
+      this.state.grid[autoPos.row][autoPos.col] = CellState.MARKED;
+      this.state.correctedCells[autoPos.row][autoPos.col] = false;
+    }
+
+    this.addToHistory(positions, oldStates, newStates, oldCorrectedStates, newCorrectedStates);
     this.checkWin();
     this.notifyStateChange();
+  }
+
+  private getAutoMarkedPositions(pos: Position): Position[] {
+    const positions: Position[] = [];
+    const seen = new Set<string>();
+
+    this.collectAutoMarkedPositionsForRow(pos.row, positions, seen);
+    this.collectAutoMarkedPositionsForCol(pos.col, positions, seen);
+
+    return positions;
+  }
+
+  private isRowSolved(row: number): boolean {
+    const size = this.state.grid[row].length;
+
+    for (let col = 0; col < size; col++) {
+      const shouldFill = this.state.solution[row][col];
+      const isFilled = this.state.grid[row][col] === CellState.FILLED;
+
+      if (shouldFill !== isFilled) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private isColSolved(col: number): boolean {
+    const size = this.state.grid.length;
+
+    for (let row = 0; row < size; row++) {
+      const shouldFill = this.state.solution[row][col];
+      const isFilled = this.state.grid[row][col] === CellState.FILLED;
+
+      if (shouldFill !== isFilled) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private collectAutoMarkedPositionsForRow(
+    row: number,
+    positions: Position[],
+    seen: Set<string>
+  ): void {
+    if (!this.isRowSolved(row)) {
+      return;
+    }
+
+    const size = this.state.grid[row].length;
+
+    for (let col = 0; col < size; col++) {
+      if (!this.state.solution[row][col] && this.state.grid[row][col] === CellState.EMPTY) {
+        this.pushUniquePosition({ row, col }, positions, seen);
+      }
+    }
+  }
+
+  private collectAutoMarkedPositionsForCol(
+    col: number,
+    positions: Position[],
+    seen: Set<string>
+  ): void {
+    if (!this.isColSolved(col)) {
+      return;
+    }
+
+    const size = this.state.grid.length;
+
+    for (let row = 0; row < size; row++) {
+      if (!this.state.solution[row][col] && this.state.grid[row][col] === CellState.EMPTY) {
+        this.pushUniquePosition({ row, col }, positions, seen);
+      }
+    }
+  }
+
+  private pushUniquePosition(pos: Position, positions: Position[], seen: Set<string>): void {
+    const key = `${pos.row}:${pos.col}`;
+
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    positions.push(pos);
   }
 
   private getCorrectionState(pos: Position, state: CellState): CellState | null {
