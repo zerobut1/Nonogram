@@ -116,6 +116,12 @@ export class Game {
     if (!this.isValidPosition(pos)) return;
 
     const currentState = this.state.grid[pos.row][pos.col];
+    const targetState = isFillMode ? CellState.FILLED : CellState.MARKED;
+
+    if (this.state.mode === 'assist' && currentState === targetState) {
+      return;
+    }
+
     let newState: CellState;
 
     if (isFillMode) {

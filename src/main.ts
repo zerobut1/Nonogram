@@ -308,6 +308,9 @@ window.addEventListener('keydown', (e) => {
     } else {
       game?.undo();
     }
+  } else if (e.code === 'Space') {
+    e.preventDefault();
+    setFillMode(!isFillMode);
   } else if (e.key === 'f' || e.key === 'F') {
     setFillMode(!isFillMode);
   } else if (e.key === 'r' || e.key === 'R') {
