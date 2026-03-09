@@ -17,8 +17,8 @@
             <span></span>
           </div>
           <div class="brand-copy">
-            <strong>nonogram</strong>
-            <span>logic studio</span>
+            <strong>数织</strong>
+            <span>YUTREL STUDIO</span>
           </div>
         </div>
 
@@ -62,27 +62,11 @@
         <section class="board-stage">
           <header class="stage-topbar">
             <div>
-              <p class="eyebrow">逻辑填图</p>
-              <h1>数织游戏 - Nonogram</h1>
-            </div>
-            <div class="header-controls">
-              <button id="mode-free" class="btn stage-chip">自由模式</button>
-              <button id="mode-assist" class="btn stage-chip active">纠错模式</button>
+              <h1 id="current-puzzle-title">爱心</h1>
             </div>
           </header>
 
           <div class="board-shell">
-            <div class="board-meta">
-              <div class="meta-pill">
-                <span>当前操作</span>
-                <strong id="current-tool-label">填充模式</strong>
-              </div>
-              <div class="meta-pill">
-                <span>谜题类型</span>
-                <strong>像素图案</strong>
-              </div>
-            </div>
-
             <div class="game-board-wrapper">
               <canvas id="game-canvas"></canvas>
             </div>
@@ -98,19 +82,13 @@
               </div>
               <div class="board-status">
                 <span>快捷键</span>
-                <strong>Space / Z / R</strong>
+                <strong>Space</strong>
               </div>
             </footer>
           </div>
         </section>
 
         <aside class="control-rail">
-          <section class="rail-toolbar">
-            <button id="btn-undo" class="icon-btn" disabled aria-label="撤销">↺</button>
-            <button id="btn-redo" class="icon-btn" disabled aria-label="重做">↻</button>
-            <button id="btn-clear" class="icon-btn" aria-label="清空">⌫</button>
-          </section>
-
           <section class="rail-panel">
             <div class="panel-heading">
               <p class="eyebrow">输入方式</p>

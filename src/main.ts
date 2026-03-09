@@ -1,7 +1,7 @@
 import { Game } from './core/Game';
 import { Renderer } from './ui/Renderer';
 import { PRESETS, getPuzzlesByDifficulty } from './data/presets';
-import { Position, CellState, GameMode } from './types/index';
+import { Position, CellState } from './types/index';
 import './style.css';
 
 // 游戏实例
@@ -10,7 +10,6 @@ let renderer: Renderer | null = null;
 
 // 状态
 let currentPuzzleIndex = 0;
-let currentGameMode: GameMode = 'assist';
 let isFillMode = true;
 let isDragging = false;
 let dragState: 'fill' | 'mark' | null = null;
@@ -19,16 +18,11 @@ let lastCell: Position | null = null;
 // DOM 元素
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const btnMenu = document.getElementById('btn-menu') as HTMLButtonElement;
-const btnUndo = document.getElementById('btn-undo') as HTMLButtonElement;
-const btnRedo = document.getElementById('btn-redo') as HTMLButtonElement;
-const btnClear = document.getElementById('btn-clear') as HTMLButtonElement;
-const modeFree = document.getElementById('mode-free') as HTMLButtonElement;
-const modeAssist = document.getElementById('mode-assist') as HTMLButtonElement;
 const modeFill = document.getElementById('mode-fill') as HTMLButtonElement;
 const modeMark = document.getElementById('mode-mark') as HTMLButtonElement;
 const timerDisplay = document.getElementById('timer') as HTMLSpanElement;
 const progressDisplay = document.getElementById('progress') as HTMLSpanElement;
-const currentToolLabel = document.getElementById('current-tool-label') as HTMLSpanElement;
+const currentPuzzleTitle = document.getElementById('current-puzzle-title') as HTMLHeadingElement;
 const menuModal = document.getElementById('menu-modal') as HTMLDivElement;
 const winModal = document.getElementById('win-modal') as HTMLDivElement;
 const btnCloseMenu = document.getElementById('btn-close-menu') as HTMLButtonElement;
@@ -48,7 +42,7 @@ function initGame(puzzleIndex: number = 0): void {
   }
 
   // 创建新游戏
-  game = new Game(PRESETS[puzzleIndex], { mode: currentGameMode });
+  game = new Game(PRESETS[puzzleIndex], { mode: 'assist' });
   
   // 创建渲染器
   if (!renderer) {
@@ -77,17 +71,15 @@ function initGame(puzzleIndex: number = 0): void {
 // 更新 UI
 function updateUI(): void {
   if (!game) return;
-  
-  // 更新按钮状态
-  btnUndo.disabled = !game.canUndo();
-  btnRedo.disabled = !game.canRedo();
+  const currentPuzzle = PRESETS[currentPuzzleIndex];
   
   // 更新计时器
   timerDisplay.textContent = game.formatTime();
   
   // 更新进度
   progressDisplay.textContent = `${game.getProgress()}%`;
-  currentToolLabel.textContent = isFillMode ? '填充模式' : '标记模式';
+  currentPuzzleTitle.textContent = currentPuzzle.name;
+  document.title = `${currentPuzzle.name} - 数织`;
 }
 
 // 设置 Canvas 事件
@@ -165,22 +157,6 @@ function setFillMode(fill: boolean): void {
     modeFill.classList.remove('active');
     modeMark.classList.add('active');
   }
-
-  currentToolLabel.textContent = fill ? '填充模式' : '标记模式';
-}
-
-function setGameMode(mode: GameMode): void {
-  currentGameMode = mode;
-
-  if (mode === 'assist') {
-    modeAssist.classList.add('active');
-    modeFree.classList.remove('active');
-  } else {
-    modeAssist.classList.remove('active');
-    modeFree.classList.add('active');
-  }
-
-  initGame(currentPuzzleIndex);
 }
 
 // 显示菜单
@@ -284,11 +260,6 @@ function nextPuzzle(): void {
 // 事件监听
 btnMenu.addEventListener('click', showMenu);
 btnCloseMenu.addEventListener('click', hideMenu);
-btnUndo.addEventListener('click', () => game?.undo());
-btnRedo.addEventListener('click', () => game?.redo());
-btnClear.addEventListener('click', () => game?.clear());
-modeFree.addEventListener('click', () => setGameMode('free'));
-modeAssist.addEventListener('click', () => setGameMode('assist'));
 modeFill.addEventListener('click', () => setFillMode(true));
 modeMark.addEventListener('click', () => setFillMode(false));
 btnCloseWin.addEventListener('click', hideWinModal);
