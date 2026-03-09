@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>数织游戏 - Nonogram</title>
+    <script type="module" crossorigin src="/assets/index-BBY9PH0o.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CumHmD14.css">
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <h1>🎮 数织游戏</h1>
+        <div class="header-controls">
+          <button id="btn-menu" class="btn">菜单</button>
+        </div>
+      </header>
+      
+      <main class="game-container">
+        <div class="game-board-wrapper">
+          <canvas id="game-canvas"></canvas>
+        </div>
+        
+        <aside class="sidebar">
+          <div class="panel">
+            <h3>游戏模式</h3>
+            <div class="mode-toggle">
+              <button id="mode-free" class="btn">自由模式</button>
+              <button id="mode-assist" class="btn active">纠错模式</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>操作模式</h3>
+            <div class="mode-toggle">
+              <button id="mode-fill" class="btn active">填充 ■</button>
+              <button id="mode-mark" class="btn">标记 ✕</button>
+            </div>
+          </div>
+          
+          <div class="panel">
+            <h3>控制</h3>
+            <div class="controls">
+              <button id="btn-undo" class="btn" disabled>撤销 ↩</button>
+              <button id="btn-redo" class="btn" disabled>重做 ↪</button>
+              <button id="btn-clear" class="btn">清空 ⟲</button>
+            </div>
+          </div>
+          
+          <div class="panel">
+            <h3>进度</h3>
+            <div class="stats">
+              <div class="stat">
+                <span class="label">时间:</span>
+                <span id="timer">00:00</span>
+              </div>
+              <div class="stat">
+                <span class="label">完成度:</span>
+                <span id="progress">0%</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </main>
+      
+      <!-- 菜单模态框 -->
+      <div id="menu-modal" class="modal hidden">
+        <div class="modal-content">
+          <h2>选择谜题</h2>
+          <div class="difficulty-tabs">
+            <button class="tab active" data-difficulty="all">全部</button>
+            <button class="tab" data-difficulty="easy">简单</button>
+            <button class="tab" data-difficulty="medium">中等</button>
+            <button class="tab" data-difficulty="hard">困难</button>
+          </div>
+          <div id="puzzle-list" class="puzzle-list"></div>
+          <button id="btn-close-menu" class="btn close-btn">关闭</button>
+        </div>
+      </div>
+      
+      <!-- 胜利弹窗 -->
+      <div id="win-modal" class="modal hidden">
+        <div class="modal-content">
+          <h2>🎉 恭喜完成!</h2>
+          <p>你成功解开了这个谜题!</p>
+          <div class="win-stats">
+            <p>用时: <span id="win-time">00:00</span></p>
+          </div>
+          <button id="btn-next" class="btn primary">下一个谜题</button>
+          <button id="btn-close-win" class="btn">关闭</button>
+        </div>
+      </div>
+    </div>
+    
+  </body>
+</html>

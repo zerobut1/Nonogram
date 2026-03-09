@@ -60,6 +60,7 @@ export interface RenderConfig {
     marked: string;
     correction: string;
     hint: string;
+    hintCompleted: string;
     completed: string;
   };
 }

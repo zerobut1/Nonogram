@@ -30,6 +30,7 @@ export class Renderer {
         marked: '#999999',
         correction: '#e53935',
         hint: '#333333',
+        hintCompleted: '#999999',
         completed: '#4caf50'
       },
       ...config
@@ -103,40 +104,172 @@ export class Renderer {
   // 绘制行提示
   private renderRowHints(state: GameState): void {
     const { cellSize, hintWidth, gap, colors } = this.config;
-    
-    this.ctx.fillStyle = colors.hint;
-    this.ctx.font = `${Math.floor(cellSize * 0.6)}px Arial`;
+    const fontSize = Math.floor(cellSize * 0.6);
+
+    this.ctx.font = `${fontSize}px Arial`;
     this.ctx.textAlign = 'right';
     this.ctx.textBaseline = 'middle';
 
     state.rowHints.forEach((hints, row) => {
-      const hintText = hints.join(' ');
       const y = hintWidth + gap + row * (cellSize + gap) + cellSize / 2;
       const x = hintWidth - 5;
-      
-      this.ctx.fillText(hintText, x, y);
+      const completed = this.getCompletedHints(
+        state.grid[row],
+        state.solution[row],
+        hints
+      );
+      const spacing = Math.max(4, Math.floor(fontSize * 0.35));
+      let currentX = x;
+
+      for (let i = hints.length - 1; i >= 0; i--) {
+        const text = String(hints[i]);
+        this.ctx.fillStyle = completed[i] ? colors.hintCompleted : colors.hint;
+        this.ctx.fillText(text, currentX, y);
+        currentX -= this.ctx.measureText(text).width + spacing;
+      }
     });
   }
 
   // 绘制列提示
   private renderColHints(state: GameState): void {
     const { cellSize, hintWidth, gap, colors } = this.config;
-    
-    this.ctx.fillStyle = colors.hint;
-    this.ctx.font = `${Math.floor(cellSize * 0.5)}px Arial`;
+    const fontSize = Math.floor(cellSize * 0.5);
+
+    this.ctx.font = `${fontSize}px Arial`;
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'bottom';
 
     state.colHints.forEach((hints, col) => {
-      const hintText = hints.join('\n');
-      const lines = hintText.split('\n');
       const x = hintWidth + gap + col * (cellSize + gap) + cellSize / 2;
-      
-      lines.forEach((line, index) => {
-        const y = hintWidth - 3 - (lines.length - 1 - index) * (cellSize * 0.5);
-        this.ctx.fillText(line, x, y);
+      const lineStates = state.grid.map((row) => row[col]);
+      const solutionLine = state.solution.map((row) => row[col]);
+      const completed = this.getCompletedHints(lineStates, solutionLine, hints);
+
+      hints.forEach((hint, index) => {
+        const y = hintWidth - 3 - (hints.length - 1 - index) * (cellSize * 0.5);
+        this.ctx.fillStyle = completed[index] ? colors.hintCompleted : colors.hint;
+        this.ctx.fillText(String(hint), x, y);
       });
     });
+  }
+
+  private getCompletedHints(
+    lineStates: CellState[],
+    solutionLine: boolean[],
+    hints: number[]
+  ): boolean[] {
+    if (hints.length === 1 && hints[0] === 0) {
+      const isComplete = this.getResolvedPrefixLength(lineStates, solutionLine) === lineStates.length;
+      return [isComplete];
+    }
+
+    const completed = Array(hints.length).fill(false);
+    const completedFromStart = this.getCompletedHintCountFromStart(lineStates, solutionLine, hints);
+    const completedFromEnd = this.getCompletedHintCountFromEnd(lineStates, solutionLine, hints);
+
+    for (let i = 0; i < completedFromStart; i++) {
+      completed[i] = true;
+    }
+
+    for (let i = hints.length - completedFromEnd; i < hints.length; i++) {
+      if (i >= 0) {
+        completed[i] = true;
+      }
+    }
+
+    return completed;
+  }
+
+  private getCompletedHintCountFromStart(
+    lineStates: CellState[],
+    solutionLine: boolean[],
+    hints: number[]
+  ): number {
+    const resolvedPrefixLength = this.getResolvedPrefixLength(lineStates, solutionLine);
+    const prefixRuns = this.getFilledRuns(lineStates.slice(0, resolvedPrefixLength));
+    let count = 0;
+
+    while (count < prefixRuns.length && count < hints.length && prefixRuns[count] === hints[count]) {
+      count++;
+    }
+
+    return count;
+  }
+
+  private getCompletedHintCountFromEnd(
+    lineStates: CellState[],
+    solutionLine: boolean[],
+    hints: number[]
+  ): number {
+    const resolvedSuffixStart = this.getResolvedSuffixStart(lineStates, solutionLine);
+    const suffixRuns = this.getFilledRuns(lineStates.slice(resolvedSuffixStart));
+    let count = 0;
+
+    while (
+      count < suffixRuns.length &&
+      count < hints.length &&
+      suffixRuns[suffixRuns.length - 1 - count] === hints[hints.length - 1 - count]
+    ) {
+      count++;
+    }
+
+    return count;
+  }
+
+  private getResolvedPrefixLength(lineStates: CellState[], solutionLine: boolean[]): number {
+    let length = 0;
+
+    while (length < lineStates.length) {
+      const cellState = lineStates[length];
+      if (cellState === CellState.EMPTY || !this.isCellResolvedCorrectly(cellState, solutionLine[length])) {
+        break;
+      }
+      length++;
+    }
+
+    return length;
+  }
+
+  private getResolvedSuffixStart(lineStates: CellState[], solutionLine: boolean[]): number {
+    let index = lineStates.length - 1;
+
+    while (index >= 0) {
+      const cellState = lineStates[index];
+      if (cellState === CellState.EMPTY || !this.isCellResolvedCorrectly(cellState, solutionLine[index])) {
+        break;
+      }
+      index--;
+    }
+
+    return index + 1;
+  }
+
+  private getFilledRuns(lineStates: CellState[]): number[] {
+    const runs: number[] = [];
+    let count = 0;
+
+    lineStates.forEach((cellState) => {
+      if (cellState === CellState.FILLED) {
+        count++;
+      } else if (count > 0) {
+        runs.push(count);
+        count = 0;
+      }
+    });
+
+    if (count > 0) {
+      runs.push(count);
+    }
+
+    return runs;
+  }
+
+  private isCellResolvedCorrectly(cellState: CellState, shouldFill: boolean): boolean {
+    if (shouldFill) {
+      return cellState === CellState.FILLED;
+    }
+
+    return cellState === CellState.MARKED;
   }
 
   // 绘制网格线
